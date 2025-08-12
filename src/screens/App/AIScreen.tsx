@@ -77,7 +77,12 @@ export const AIScreen: React.FC<AIScreenProps> = ({ navigation }) => {
 
   const loadAIRecommendations = async () => {
     try {
+      setIsGenerating(true);
+      console.log('Загружаем AI рекомендации...');
+      
       const recommendations = await AIService.getBusinessRecommendations();
+      console.log('Получены рекомендации:', recommendations.length);
+      
       setAiRecommendations(recommendations);
     } catch (error) {
       console.error('Ошибка при загрузке AI рекомендаций:', error);
@@ -102,6 +107,8 @@ export const AIScreen: React.FC<AIScreenProps> = ({ navigation }) => {
           createdAt: new Date().toISOString()
         }
       ]);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -259,6 +266,14 @@ export const AIScreen: React.FC<AIScreenProps> = ({ navigation }) => {
 
   const formatCurrency = (amount: number) => {
     return `${amount.toLocaleString('uk-UA')} грн`;
+  };
+
+  const handleRecommendationPress = (recommendation: AIRecommendation) => {
+    Alert.alert(
+      `Рекомендація: ${recommendation.title}`,
+      recommendation.description,
+      [{ text: "ОК", onPress: () => console.log("Рекомендація натиснута") }]
+    );
   };
 
   return (
@@ -450,65 +465,76 @@ export const AIScreen: React.FC<AIScreenProps> = ({ navigation }) => {
           </Animated.View>
 
           {/* AI Рекомендації */}
-          <Animated.View
-            style={[
-              styles.recommendationsSection,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <View style={styles.recommendationsHeader}>
-              <Text style={styles.sectionTitle}>
-                AI Рекомендації ({filteredRecommendations.length})
-              </Text>
+          <View style={styles.aiSection}>
+            <View style={styles.sectionHeader}>
+              <Icon name="psychology" size={24} color="#FFD700" />
+              <Text style={styles.sectionTitle}>AI Рекомендації</Text>
+              {isGenerating && (
+                <View style={styles.loadingIndicator}>
+                  <Text style={styles.loadingText}>AI аналізує дані...</Text>
+                </View>
+              )}
             </View>
             
-            {filteredRecommendations.map((rec, index) => (
-              <Card key={rec.id} variant="elevated" padding="large" style={styles.recommendationCard}>
-                <View style={styles.recommendationHeader}>
-                  <View style={styles.recommendationType}>
-                    <Icon 
-                      name={rec.type === 'price_optimization' ? 'attach-money' :
-                           rec.type === 'inventory_management' ? 'inventory' :
-                           rec.type === 'sales_forecast' ? 'trending-up' :
-                           rec.type === 'tax_reminder' ? 'account-balance' : 'info'}
-                      size={24} 
-                      color="#4A90E2" 
-                    />
-                    <Text style={styles.recommendationTitle}>{rec.title}</Text>
-                  </View>
-                  <View style={[
-                    styles.priorityBadge,
-                    { backgroundColor: getPriorityColor(rec.priority) }
-                  ]}>
-                    <Text style={styles.priorityText}>
-                      {getPriorityName(rec.priority)}
-                    </Text>
-                  </View>
-                </View>
-                
-                <Text style={styles.recommendationDescription}>
-                  {rec.description}
+            {/* Информация о реальных данных */}
+            {businessMetrics && (
+              <View style={styles.dataInfo}>
+                <Text style={styles.dataInfoTitle}>📊 Аналіз на основі реальних даних:</Text>
+                <Text style={styles.dataInfoText}>
+                  Дохід: {businessMetrics.revenue} грн | Прибуток: {businessMetrics.profit} грн | 
+                  Замовлень: {businessMetrics.ordersCount} | Клієнтів: {businessMetrics.customerCount}
                 </Text>
-                
-                <View style={styles.recommendationFooter}>
-                  <Text style={styles.recommendationDate}>
-                    {new Date(rec.createdAt).toLocaleDateString('uk-UA')}
-                  </Text>
-                  <View style={styles.recommendationActions}>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Text style={styles.actionButtonText}>Застосувати</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Text style={styles.actionButtonText}>Детальніше</Text>
-                    </TouchableOpacity>
+              </View>
+            )}
+            
+            {aiRecommendations.length > 0 ? (
+              aiRecommendations.map((recommendation) => (
+                <TouchableOpacity
+                  key={recommendation.id}
+                  style={[
+                    styles.recommendationCard,
+                    recommendation.priority === 'high' && styles.highPriority,
+                    recommendation.priority === 'medium' && styles.mediumPriority,
+                    recommendation.priority === 'low' && styles.lowPriority,
+                  ]}
+                  onPress={() => handleRecommendationPress(recommendation)}
+                >
+                  <View style={styles.recommendationHeader}>
+                    <Text style={styles.recommendationTitle}>{recommendation.title}</Text>
+                    <View style={[
+                      styles.priorityBadge,
+                      recommendation.priority === 'high' && styles.highPriorityBadge,
+                      recommendation.priority === 'medium' && styles.mediumPriorityBadge,
+                      recommendation.priority === 'low' && styles.lowPriorityBadge,
+                    ]}>
+                      <Text style={styles.priorityText}>
+                        {recommendation.priority === 'high' ? 'Високий' : 
+                         recommendation.priority === 'medium' ? 'Середній' : 'Низький'}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </Card>
-            ))}
-          </Animated.View>
+                  <Text style={styles.recommendationDescription}>{recommendation.description}</Text>
+                  <Text style={styles.recommendationDate}>
+                    {new Date(recommendation.createdAt).toLocaleDateString('uk-UA')}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.noRecommendations}>
+                <Icon name="psychology" size={48} color="#666" />
+                <Text style={styles.noRecommendationsText}>
+                  {isGenerating ? 'AI аналізує ваші дані...' : 'Натисніть "Отримати рекомендації" для аналізу'}
+                </Text>
+              </View>
+            )}
+            
+            <Button
+              title={isGenerating ? "AI аналізує..." : "Отримати рекомендації"}
+              onPress={loadAIRecommendations}
+              disabled={isGenerating}
+              style={styles.getRecommendationsButton}
+            />
+          </View>
 
           {/* Аналіз маркетплейсів */}
           <Animated.View
@@ -888,5 +914,75 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#FFFFFF",
     marginBottom: 4,
+  },
+  aiSection: {
+    marginBottom: 30,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  loadingIndicator: {
+    backgroundColor: "#333",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignSelf: "center",
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#999",
+  },
+  dataInfo: {
+    backgroundColor: "#111",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#333",
+  },
+  dataInfoTitle: {
+    fontSize: 14,
+    color: "#999",
+    marginBottom: 8,
+  },
+  dataInfoText: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  noRecommendations: {
+    alignItems: "center",
+    paddingVertical: 30,
+  },
+  noRecommendationsText: {
+    fontSize: 16,
+    color: "#999",
+    marginTop: 16,
+  },
+  getRecommendationsButton: {
+    marginTop: 16,
+  },
+  highPriority: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF6B6B",
+  },
+  mediumPriority: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#F39C12",
+  },
+  lowPriority: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#50C878",
+  },
+  highPriorityBadge: {
+    backgroundColor: "#FF6B6B",
+  },
+  mediumPriorityBadge: {
+    backgroundColor: "#F39C12",
+  },
+  lowPriorityBadge: {
+    backgroundColor: "#50C878",
   },
 }); 

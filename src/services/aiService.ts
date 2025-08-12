@@ -32,40 +32,87 @@ export class AIService {
   // Получение бизнес рекомендаций на основе реальных данных
   static async getBusinessRecommendations(): Promise<AIRecommendation[]> {
     try {
+      console.log('Загружаем бизнес данные для AI анализа...');
+      
       const metrics = await BusinessDataService.getBusinessMetrics();
       const marketplacePerformance = await BusinessDataService.getMarketplacePerformance();
+      const orders = await BusinessDataService.getOrders();
+      const expenses = await BusinessDataService.getExpenses();
+      const taxes = await BusinessDataService.getTaxes();
+      
+      console.log('Бизнес данные загружены:', {
+        revenue: metrics.revenue,
+        profit: metrics.profit,
+        ordersCount: metrics.ordersCount,
+        expenses: metrics.expenses
+      });
       
       const prompt = `Проаналізуй наступні бізнес дані українського ФОП та надай 5 практичних рекомендацій:
 
-Доходи: ${metrics.revenue} грн
-Витрати: ${metrics.expenses} грн
-Прибуток: ${metrics.profit} грн
-Кількість замовлень: ${metrics.ordersCount}
-Середній чек: ${metrics.averageOrderValue} грн
-Кількість клієнтів: ${metrics.customerCount}
-Податкові зобов'язання: ${metrics.taxObligations} грн
-Грошовий потік: ${metrics.cashFlow} грн
+ФІНАНСОВІ ПОКАЗНИКИ:
+- Дохід: ${metrics.revenue} грн
+- Витрати: ${metrics.expenses} грн
+- Прибуток: ${metrics.profit} грн
+- Кількість замовлень: ${metrics.ordersCount}
+- Середній чек: ${metrics.averageOrderValue} грн
+- Кількість клієнтів: ${metrics.customerCount}
+- Податкові зобов'язання: ${metrics.taxObligations} грн
+- Грошовий потік: ${metrics.cashFlow} грн
 
-Маркетплейси: ${marketplacePerformance.map(mp => `${mp.name}: ${mp.revenue} грн, ${mp.orders} замовлень`).join(', ')}
+МАРКЕТПЛЕЙСИ:
+${marketplacePerformance.map(mp => 
+  `- ${mp.name}: дохід ${mp.revenue} грн, ${mp.orders} замовлень, середній чек ${mp.averageOrder} грн, комісія ${mp.commission} грн`
+).join('\n')}
 
-Надай рекомендації по:
-1. Оптимізації цін та збільшенню прибутку
-2. Управлінню складом та логістикою
-3. Прогнозуванню продажів
-4. Податковому плануванню
-5. Розвитку на маркетплейсах
+ЗАМОВЛЕННЯ (останні 5):
+${orders.slice(-5).map(order => 
+  `- ${order.date}: ${order.amount} грн, ${order.marketplace}, ${order.customerName}`
+).join('\n')}
 
-Формат: коротка назва, детальний опис, пріоритет (low/medium/high).`;
+      ВИТРАТИ (категорії):
+${Object.entries(expenses.reduce((acc, exp) => {
+  acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
+  return acc;
+}, {} as Record<string, number>)).map(([category, amount]) => 
+  `- ${category}: ${amount} грн`
+).join('\n')}
+
+ПОДАТКИ:
+${taxes.filter(tax => !tax.isPaid).map(tax => 
+  `- ${tax.type} за ${tax.period}: ${tax.amount} грн (термін: ${tax.dueDate})`
+).join('\n')}
+
+АНАЛІЗ ТА РЕКОМЕНДАЦІЇ:
+1. Аналіз рентабельності та оптимізація цін
+2. Управління витратами та оптимізація логістики
+3. Стратегія розвитку на маркетплейсах
+4. Податкове планування та оптимізація
+5. Прогнозування продажів та управління складом
+
+Формат відповіді:
+Назва: [коротка назва]
+Опис: [детальний опис з конкретними цифрами]
+Пріоритет: [high/medium/low]
+Тип: [price_optimization/inventory_management/sales_forecast/tax_reminder]
+
+Відповідай українською мовою з практичними кроками.`;
+      
+      console.log('Отправляем запрос к OpenAI...');
       
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 800,
+        max_tokens: 1000,
         temperature: 0.7,
       });
 
       const response = completion.choices[0]?.message?.content || '';
-      return this.parseRecommendations(response);
+      console.log('Получен ответ от OpenAI:', response.substring(0, 200) + '...');
+      
+      const recommendations = this.parseRecommendations(response);
+      console.log('Спарсено рекомендаций:', recommendations.length);
+      
+      return recommendations;
     } catch (error) {
       console.error('Ошибка получения рекомендаций:', error);
       return this.getMockRecommendations();
@@ -94,8 +141,8 @@ export class AIService {
 1. Аналізі рентабельності
 2. Оптимізації витрат
 3. Збільшенні прибутку
-4. Податковому плануванні
-5. Прогнозуванні на наступні місяці
+4. Податковому плануванню
+5. Прогнозуванню на наступні місяці
 
 Надай практичні рекомендації українською мовою.`;
       
@@ -239,27 +286,119 @@ ${marketplacePerformance.map(mp =>
   // Парсинг рекомендаций из AI ответа
   private static parseRecommendations(response: string): AIRecommendation[] {
     try {
+      console.log('Парсим рекомендации из ответа OpenAI...');
+      
       const recommendations: AIRecommendation[] = [];
       const lines = response.split('\n').filter(line => line.trim());
       
-      lines.forEach((line, index) => {
-        if (line.includes(':')) {
-          const [title, description] = line.split(':').map(s => s.trim());
+      let currentRecommendation: Partial<AIRecommendation> = {};
+      let recommendationIndex = 0;
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        if (trimmedLine.toLowerCase().includes('назва:') || trimmedLine.toLowerCase().includes('назва:')) {
+          // Если у нас есть предыдущая рекомендация, сохраняем её
+          if (currentRecommendation.title && currentRecommendation.description) {
+            recommendations.push({
+              id: `rec-${recommendationIndex}`,
+              type: currentRecommendation.type || 'price_optimization',
+              title: currentRecommendation.title,
+              description: currentRecommendation.description,
+              priority: currentRecommendation.priority || 'medium',
+              isRead: false,
+              createdAt: new Date().toISOString()
+            });
+            recommendationIndex++;
+          }
+          
+          // Начинаем новую рекомендацию
+          currentRecommendation = {
+            title: trimmedLine.split(':')[1]?.trim() || `Рекомендація ${recommendationIndex + 1}`
+          };
+        } else if (trimmedLine.toLowerCase().includes('опис:') || trimmedLine.toLowerCase().includes('опис:')) {
+          currentRecommendation.description = trimmedLine.split(':')[1]?.trim() || 'Описание недоступно';
+        } else if (trimmedLine.toLowerCase().includes('пріоритет:') || trimmedLine.toLowerCase().includes('пріоритет:')) {
+          const priority = trimmedLine.split(':')[1]?.trim().toLowerCase();
+          if (priority === 'high' || priority === 'medium' || priority === 'low') {
+            currentRecommendation.priority = priority;
+          }
+        } else if (trimmedLine.toLowerCase().includes('тип:') || trimmedLine.toLowerCase().includes('тип:')) {
+          const type = trimmedLine.split(':')[1]?.trim();
+          if (type) {
+            // Определяем тип по ключевым словам
+            if (type.includes('цін') || type.includes('price')) {
+              currentRecommendation.type = 'price_optimization';
+            } else if (type.includes('склад') || type.includes('inventory')) {
+              currentRecommendation.type = 'inventory_management';
+            } else if (type.includes('продаж') || type.includes('sales')) {
+              currentRecommendation.type = 'sales_forecast';
+            } else if (type.includes('подат') || type.includes('tax')) {
+              currentRecommendation.type = 'tax_reminder';
+            } else {
+              currentRecommendation.type = 'price_optimization';
+            }
+          }
+        } else if (trimmedLine && !trimmedLine.startsWith('-') && !trimmedLine.startsWith('•')) {
+          // Если строка не пустая и не является списком, возможно это продолжение описания
+          if (currentRecommendation.description && currentRecommendation.description.length < 200) {
+            currentRecommendation.description += ' ' + trimmedLine;
+          }
+        }
+      }
+      
+      // Добавляем последнюю рекомендацию
+      if (currentRecommendation.title && currentRecommendation.description) {
+        recommendations.push({
+          id: `rec-${recommendationIndex}`,
+          type: currentRecommendation.type || 'price_optimization',
+          title: currentRecommendation.title,
+          description: currentRecommendation.description,
+          priority: currentRecommendation.priority || 'medium',
+          isRead: false,
+          createdAt: new Date().toISOString()
+        });
+      }
+      
+      console.log(`Успешно спарсено ${recommendations.length} рекомендаций`);
+      
+      // Если не удалось спарсить структурированные рекомендации, пробуем простой парсинг
+      if (recommendations.length === 0) {
+        console.log('Пробуем простой парсинг...');
+        return this.simpleParseRecommendations(response);
+      }
+      
+      return recommendations;
+    } catch (error) {
+      console.error('Ошибка парсинга рекомендаций:', error);
+      return this.getMockRecommendations();
+    }
+  }
+
+  // Простой парсинг для случаев, когда структурированный не сработал
+  private static simpleParseRecommendations(response: string): AIRecommendation[] {
+    try {
+      const recommendations: AIRecommendation[] = [];
+      const lines = response.split('\n').filter(line => line.trim() && line.length > 10);
+      
+      lines.slice(0, 5).forEach((line, index) => {
+        const cleanLine = line.replace(/^\d+\.\s*/, '').trim();
+        if (cleanLine.length > 20) {
           recommendations.push({
             id: `rec-${index}`,
-            type: 'price_optimization',
-            title: title || `Рекомендація ${index + 1}`,
-            description: description || 'Описание недоступно',
+            type: index < 2 ? 'price_optimization' : index < 4 ? 'inventory_management' : 'tax_reminder',
+            title: cleanLine.substring(0, 50) + (cleanLine.length > 50 ? '...' : ''),
+            description: cleanLine,
             priority: index < 2 ? 'high' : index < 4 ? 'medium' : 'low',
             isRead: false,
             createdAt: new Date().toISOString()
           });
         }
       });
-
+      
       return recommendations.length > 0 ? recommendations : this.getMockRecommendations();
     } catch (error) {
-      console.error('Ошибка парсинга рекомендаций:', error);
+      console.error('Ошибка простого парсинга:', error);
       return this.getMockRecommendations();
     }
   }

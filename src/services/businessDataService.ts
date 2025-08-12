@@ -404,10 +404,13 @@ export class BusinessDataService {
       // Проверяем, есть ли уже данные
       const existingOrders = await this.getOrders();
       if (existingOrders.length > 0) {
+        console.log('Демо данные уже существуют, пропускаем инициализацию');
         return; // Данные уже есть
       }
 
-      // Создаем демо заказы
+      console.log('Начинаем инициализацию демо данных...');
+
+      // Создаем демо заказы с более разнообразными данными
       const demoOrders: Omit<Order, 'id' | 'userId'>[] = [
         {
           date: '2024-01-15',
@@ -420,7 +423,7 @@ export class BusinessDataService {
           netAmount: 2250,
           paymentMethod: 'card',
           items: [
-            { id: '1', name: 'Смартфон', quantity: 1, unitPrice: 2500, totalPrice: 2500, category: 'Електроніка' }
+            { id: '1', name: 'Смартфон Samsung Galaxy', quantity: 1, unitPrice: 2500, totalPrice: 2500, category: 'Електроніка' }
           ]
         },
         {
@@ -434,7 +437,49 @@ export class BusinessDataService {
           netAmount: 1620,
           paymentMethod: 'transfer',
           items: [
-            { id: '2', name: 'Навушники', quantity: 1, unitPrice: 1800, totalPrice: 1800, category: 'Аксесуари' }
+            { id: '2', name: 'Навушники AirPods', quantity: 1, unitPrice: 1800, totalPrice: 1800, category: 'Аксесуари' }
+          ]
+        },
+        {
+          date: '2024-01-25',
+          amount: 3200,
+          marketplace: 'OLX',
+          customerName: 'Олександр Сидоренко',
+          customerEmail: 'oleksandr@example.com',
+          status: 'completed',
+          commission: 320,
+          netAmount: 2880,
+          paymentMethod: 'card',
+          items: [
+            { id: '3', name: 'Планшет iPad', quantity: 1, unitPrice: 3200, totalPrice: 3200, category: 'Електроніка' }
+          ]
+        },
+        {
+          date: '2024-02-01',
+          amount: 950,
+          marketplace: 'Rozetka',
+          customerName: 'Анна Мельник',
+          customerEmail: 'anna@example.com',
+          status: 'completed',
+          commission: 95,
+          netAmount: 855,
+          paymentMethod: 'cash',
+          items: [
+            { id: '4', name: 'Портативна колонка', quantity: 1, unitPrice: 950, totalPrice: 950, category: 'Аксесуари' }
+          ]
+        },
+        {
+          date: '2024-02-05',
+          amount: 4200,
+          marketplace: 'Prom',
+          customerName: 'Віктор Іваненко',
+          customerEmail: 'viktor@example.com',
+          status: 'completed',
+          commission: 420,
+          netAmount: 3780,
+          paymentMethod: 'transfer',
+          items: [
+            { id: '5', name: 'Ноутбук Dell', quantity: 1, unitPrice: 4200, totalPrice: 4200, category: 'Електроніка' }
           ]
         }
       ];
@@ -444,7 +489,7 @@ export class BusinessDataService {
         {
           date: '2024-01-10',
           category: 'advertising',
-          description: 'Google Ads',
+          description: 'Google Ads - реклама електроніки',
           amount: 500,
           isTaxDeductible: true,
           vendor: 'Google'
@@ -452,10 +497,26 @@ export class BusinessDataService {
         {
           date: '2024-01-25',
           category: 'logistics',
-          description: 'Доставка товарів',
+          description: 'Доставка товарів Нова Пошта',
           amount: 300,
           isTaxDeductible: true,
           vendor: 'Нова Пошта'
+        },
+        {
+          date: '2024-02-01',
+          category: 'office',
+          description: 'Офісні витрати та канцелярія',
+          amount: 150,
+          isTaxDeductible: true,
+          vendor: 'Канцелярія'
+        },
+        {
+          date: '2024-02-10',
+          category: 'inventory',
+          description: 'Закупівля товарів для продажу',
+          amount: 8000,
+          isTaxDeductible: true,
+          vendor: 'Постачальник'
         }
       ];
 
@@ -468,6 +529,22 @@ export class BusinessDataService {
           dueDate: '2024-02-15',
           isPaid: false,
           notes: 'Єдиний податок за січень'
+        },
+        {
+          type: 'esv',
+          period: '2024-01',
+          amount: 1500,
+          dueDate: '2024-02-15',
+          isPaid: false,
+          notes: 'ЄСВ за січень'
+        },
+        {
+          type: 'single_tax',
+          period: '2024-02',
+          amount: 1200,
+          dueDate: '2024-03-15',
+          isPaid: false,
+          notes: 'Єдиний податок за лютий'
         }
       ];
 
@@ -477,36 +554,63 @@ export class BusinessDataService {
           name: 'Іван Петренко',
           email: 'ivan@example.com',
           phone: '+380501234567',
-          notes: 'Постійний клієнт'
+          notes: 'Постійний клієнт, купує електроніку'
         },
         {
           name: 'Марія Коваленко',
           email: 'maria@example.com',
           phone: '+380671234567',
-          notes: 'Новий клієнт'
+          notes: 'Новий клієнт, зацікавлена в аксесуарах'
+        },
+        {
+          name: 'Олександр Сидоренко',
+          email: 'oleksandr@example.com',
+          phone: '+380631234567',
+          notes: 'Клієнт середнього рівня, купує планшети'
+        },
+        {
+          name: 'Анна Мельник',
+          email: 'anna@example.com',
+          phone: '+380661234567',
+          notes: 'Клієнт, що купує аксесуари'
+        },
+        {
+          name: 'Віктор Іваненко',
+          email: 'viktor@example.com',
+          phone: '+380681234567',
+          notes: 'Великий клієнт, купує ноутбуки'
         }
       ];
 
+      console.log('Создаем демо заказы...');
       // Добавляем демо данные
       for (const order of demoOrders) {
-        await this.addOrder(order);
+        const orderId = await this.addOrder(order);
+        console.log(`Создан заказ: ${orderId}`);
       }
 
+      console.log('Создаем демо расходы...');
       for (const expense of demoExpenses) {
-        await this.addExpense(expense);
+        const expenseId = await this.addExpense(expense);
+        console.log(`Создан расход: ${expenseId}`);
       }
 
+      console.log('Создаем демо налоги...');
       for (const tax of demoTaxes) {
-        await this.addTax(tax);
+        const taxId = await this.addTax(tax);
+        console.log(`Создан налог: ${taxId}`);
       }
 
+      console.log('Создаем демо клиентов...');
       for (const customer of demoCustomers) {
-        await this.addCustomer(customer);
+        const customerId = await this.addCustomer(customer);
+        console.log(`Создан клиент: ${customerId}`);
       }
 
-      console.log('Демо данные успешно инициализированы в Firebase');
+      console.log('Демо данные успешно инициализированы!');
     } catch (error) {
       console.error('Ошибка инициализации демо данных:', error);
+      throw error;
     }
   }
 } 
